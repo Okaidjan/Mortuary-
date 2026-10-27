@@ -520,6 +520,20 @@ init_db()
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "create-admin":
-        create_admin()
-    else:
-        app.run(host=os.environ.get("HOST", "127.0.0.1"), port=int(os.environ.get("PORT", "5000")))
+        else:
+    init_db()
+    # AUTO CREATE ADMIN FOR RENDER - creates admin/admin123 if no users
+    try:
+        c = sqlite3.connect(DB_PATH)
+        cur = c.execute("SELECT id FROM users LIMIT 1")
+        if not cur.fetchone():
+            c.execute("INSERT INTO users(username,full_name,password_hash,role) VALUES(?,?,?,?)",
+                ('admin', 'Admin', generate_password_hash('Admin123'), 'admin'))
+            c.commit()
+            print("### AUTO ADMIN CREATED: admin / Admin123 ###")
+        c.close()
+    except Exception as e:
+        print(f"Auto admin skipped: {e}")
+    app.run(host=os.environ.get("HOST", "0.0.0.0"), port=int(os.environ.get("PORT", "5000")))
+    
+       
