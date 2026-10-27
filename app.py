@@ -504,17 +504,33 @@ app.jinja_env.globals.update(css=CSS, fname=FACILITY_NAME)
 
 def create_admin():
     init_db()
-    u = input("Admin username: ").strip().lower()
-    n = input("Full name: ").strip()
-    pw = getpass.getpass("Password (10+ chars, letters and numbers): ")
-    if pw != getpass.getpass("Repeat password: ") or not valid_password(pw) or not u:
-        sys.exit("Passwords did not match or were too weak. Nothing created.")
-    c = sqlite3.connect(DB_PATH)
-    c.execute("INSERT INTO users(username,full_name,password_hash,role) VALUES(?,?,?,'admin')",
-              (u, n, generate_password_hash(pw)))
-    c.commit()
-    print("Admin created. Start the server with: python app.py")
+    
+init_db()
 
+# Auto-create admin on startup - runs for gunicorn too
+try:
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.execute("SELECT id FROM users WHERE username='admin' LIMIT 1")
+    if not cur.fetchone():
+        conn.execute("INSERT INTO users(username, full_name, password_hash, role) VALUES(?,?,?,?)", ('admin', 'Admin', generate_password_hash('Admin123'), 'admin'))
+        conn.commit()
+        print("### AUTO ADMIN CREATED: admin / Admin123 ###")
+    conn.close()
+except Exception as e:
+    print(f"Auto admin check: {e}")
+
+def create_admin():
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM users WHERE username='admin'")
+    c.execute("INSERT INTO users(username, full_name, password_hash, role) VALUES(?,?,?,?)", ('admin', 'Admin', generate_password_hash('Admin123'), 'admin'))
+    conn.commit()
+    conn.close()
+    print("*** ADMIN CREATED ***")
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5000")))
 
 init_db()
 
