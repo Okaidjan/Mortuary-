@@ -70,7 +70,13 @@ def init_db():
             db.execute("INSERT INTO users (username,password,role) VALUES (?,?,?)",
                        ('admin', generate_password_hash('admin123'), 'admin'))
         db.commit()
-
+@app.route('/reset-admin')
+def reset_admin():
+    db=get_db()
+    db.execute("DELETE FROM users WHERE username='admin'")
+    db.execute("INSERT INTO users (username,password,role) VALUES (?,?,?)", ('admin', generate_password_hash('admin123'), 'admin'))
+    db.commit()
+    return "Admin reset! Login: admin / admin123 - <a href='/login'>Click to login</a>"
 @app.teardown_appcontext
 def close_db(exc):
     db = getattr(g, '_database', None)
