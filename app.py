@@ -54,22 +54,7 @@ def generate_tag_no():
     db = get_db()
     year = datetime.now().year
     prefix = f"MOH-{year}-"
-    # --- AUTO TAG GENERATOR ---
-def generate_tag_no():
-    db = get_db()
-    year = datetime.now().year
-    prefix = f"MOH-{year}-"
     cur = db.execute("SELECT tag_no FROM bodies WHERE tag_no LIKE ? ORDER BY id DESC LIMIT 1", (f"{prefix}%",))
-    row = cur.fetchone()
-    if row and row['tag_no']:
-        try:
-            last_num = int(row['tag_no'].split('-')[-1])
-            new_num = last_num + 1
-        except:
-            new_num = 1
-    else:
-        new_num = 1
-    return f"{prefix}{new_num:04d}"
     row = cur.fetchone()
     if row and row['tag_no']:
         try:
