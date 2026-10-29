@@ -50,6 +50,7 @@ def log_action(action):
     db.commit()
 
 # --- AUTO TAG GENERATOR ---
+# --- AUTO TAG GENERATOR ---
 def generate_tag_no():
     db = get_db()
     year = datetime.now().year
@@ -67,18 +68,10 @@ def generate_tag_no():
     return f"{prefix}{new_num:04d}"
 
 # --- AUTH ---
-def login_required(f):
-    from functools import wraps
-    @wraps(f)
-    def wrap(*args, **kwargs):
-        if 'user_id' not in session:
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return wrap
+    
 
-# --- PWA FILES ---
-@app.route('/manifest.json')
-def manifest():
+
+    
     return jsonify({
         "name": "Ministry of Health - Mortuary Tracking",
         "short_name": "MOH Mortuary",
