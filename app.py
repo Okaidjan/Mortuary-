@@ -170,7 +170,7 @@ def dashboard():
     longest=db.execute("SELECT * FROM bodies WHERE status='in' ORDER BY deposited_date ASC LIMIT 5").fetchall()
     html=f"""
     <div class=grid>
-      <div class="card stat"><h1>{total} / 100</h1>Currently stored ({total}% occupancy)</div>
+      <h1>{total} / 100000</h1>Currently stored ({total/1000:.2f}% occupancy)
       <div class="card stat"><h1>{this_month}</h1>Deposited this month</div>
       <div class="card stat"><h1>{released_month}</h1>Released this month</div>
       <div class="card stat"><h1 style="color:{'red' if overdue>0 else 'green'}">{overdue}</h1>Over 30 days in store</div>
