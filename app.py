@@ -88,13 +88,29 @@ def generate_tag_no():
 
 @app.route('/icon-192.png')
 def icon192():
-    return send_from_directory('.', 'icon-192.png')
+    try:
+        return send_from_directory('.', 'icon-192.png')
+    except:
+        return "", 204
 
 @app.route('/icon-512.png')
 def icon512():
-    return send_from_directory('.', 'icon-512.png')
+    try:
+        return send_from_directory('.', 'icon-512.png')
+    except:
+        return "", 204
 
-# --- ROUTES ---
+@app.before_request
+def before_request():
+    try:
+        init_db()
+    except:
+        pass
+
+
+
+
+
 @app.route('/login', methods=['GET','POST'])
 def login():
     if request.method == 'POST':
