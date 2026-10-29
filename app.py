@@ -1,48 +1,11 @@
-import os
-import sqlite3
-import base64
+import os, sqlite3
 from datetime import datetime, timedelta
-from flask import Flask, render_template_string, request, redirect, g, Response, jsonify
+from flask import Flask, render_template_string, request, redirect, url_for, session, g, jsonify, Response
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'mortuary-secret-2024-pwa')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'mortuary-pro-2026-secure-key-ghana')
 DATABASE = 'mortuary.db'
-MAX_CAPACITY = 100000
-
-# --- PWA: Minimal valid icons (1x1 dark) ---
-ICON_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
-ICON_BYTES = base64.b64decode(ICON_B64)
-
-@app.route('/manifest.json')
-def manifest():
-    return jsonify({
-        "name": "Mortuary Management",
-        "short_name": "Mortuary",
-        "description": "Mortuary Management System - Republic of Ghana",
-        "start_url": "/",
-        "display": "standalone",
-        "background_color": "#1f2937",
-        "theme_color": "#1f2937",
-        "orientation": "portrait",
-        "icons": [
-            {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
-            {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"}
-        ]
-    })
-
-@app.route('/sw.js')
-def sw():
-    js = "self.addEventListener('install', e=>self.skipWaiting());self.addEventListener('activate', e=>self.clients.claim());"
-    return Response(js, mimetype='application/javascript')
-
-@app.route('/icon-192.png')
-def icon192():
-    return Response(ICON_BYTES, mimetype='image/png')
-
-@app.route('/icon-512.png')
-def icon512():
-    return Response(ICON_BYTES, mimetype='image/png')
 
 # --- DB ---
 def get_db():
@@ -53,201 +16,249 @@ def get_db():
     return db
 
 def init_db():
-    with app.app_context():
-        db = get_db()
-        db.execute('''CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            role TEXT DEFAULT 'user')''')
-        db.execute('''CREATE TABLE IF NOT EXISTS bodies (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT, age INTEGER, gender TEXT,
-            date_deposited TEXT, deposited_by TEXT,
-            status TEXT DEFAULT 'deposited')''')
-        cur = db.execute("SELECT * FROM users WHERE username='admin'")
+    db = get_db()
+    db.execute('''CREATE TABLE IF NOT EXISTS users 
+    (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password TEXT, role TEXT)''')
+    db.execute('''CREATE TABLE IF NOT EXISTS bodies
+    (id INTEGER PRIMARY KEY, tag_no TEXT, full_name TEXT, sex TEXT, age TEXT, case_type TEXT,
+     deposited_date TEXT, released_date TEXT, deposited_by TEXT, released_by TEXT, hospital TEXT, status TEXT)''')
+    db.execute('''CREATE TABLE IF NOT EXISTS audit
+    (id INTEGER PRIMARY KEY, action TEXT, user TEXT, timestamp TEXT)''')
+    
+    cur = db.execute("SELECT * FROM users WHERE username='admin'")
+    if not cur.fetchone():
+        db.execute("INSERT INTO users (username,password,role) VALUES (?,?,?)",
+                   ('admin', generate_password_hash('admin123'), 'admin'))
+    # Create default hospitals
+    for u,p in [('korlebu','korlebu123'), ('tamale','tamale123'), ('accra','accra123')]:
+        cur = db.execute("SELECT * FROM users WHERE username=?", (u,))
         if not cur.fetchone():
             db.execute("INSERT INTO users (username,password,role) VALUES (?,?,?)",
-                       ('admin', generate_password_hash('admin123'), 'admin'))
-        db.commit()
-@app.route('/reset-admin')
-def reset_admin():
-    db=get_db()
-    db.execute("DELETE FROM users WHERE username='admin'")
-    db.execute("INSERT INTO users (username,password,role) VALUES (?,?,?)", ('admin', generate_password_hash('admin123'), 'admin'))
+                       (u, generate_password_hash(p), 'staff'))
     db.commit()
-    return "Admin reset! Login: admin / admin123 - <a href='/login'>Click to login</a>"
+
 @app.teardown_appcontext
 def close_db(exc):
     db = getattr(g, '_database', None)
-    if db: db.close()
+    if db is not None:
+        db.close()
 
-def current_user():
-    uid = request.cookies.get('user_id')
-    if not uid: return None
-    db = get_db()
-    return db.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-
+# --- AUTH ---
 def login_required(f):
     from functools import wraps
     @wraps(f)
-    def wrap(*a, **kw):
-        if not current_user(): return redirect('/login')
-        return f(*a, **kw)
+    def wrap(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
     return wrap
 
+def log_action(action):
+    db = get_db()
+    db.execute("INSERT INTO audit (action,user,timestamp) VALUES (?,?,?)",
+               (action, session.get('username','system'), datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    db.commit()
+
+# --- PWA FILES ---
+@app.route('/manifest.json')
+def manifest():
+    return jsonify({
+        "name": "Mortuary Tracking System",
+        "short_name": "Mortuary",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#0f2f3c",
+        "theme_color": "#0f2f3c",
+        "icons": [
+            {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
+            {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"}
+        ]
+    })
+
+@app.route('/icon-192.png')
+@app.route('/icon-512.png')
+def icon():
+    # Simple pro icon generated as SVG -> PNG style placeholder (solid color with text)
+    # Using 1x1 pixel trick to make Chrome happy, but returns real PNG header
+    from PIL import Image
+    import io
+    size = 192 if '192' in request.path else 512
+    img = Image.new('RGB', (size, size), color=(15, 47, 60))
+    # We can't draw text without font, so solid is enough for installability
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return Response(buf.getvalue(), mimetype='image/png')
+
+@app.route('/sw.js')
+def sw():
+    return Response("self.addEventListener('install', e=>self.skipWaiting());self.addEventListener('fetch', e=>e.respondWith(fetch(e.request)));", mimetype='application/javascript')
+
+# --- TEMPLATES ---
 BASE_HTML = """
-<!DOCTYPE html><html><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mortuary</title>
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#1f2937">
-<link rel="apple-touch-icon" href="/icon-192.png">
-<script>if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}</script>
+<meta name="theme-color" content="#0f2f3c">
+<title>Mortuary Tracking</title>
 <style>
-body{font-family:Arial;background:#f3f4f6;margin:0}
-.nav{background:#1f2937;color:white;padding:12px;display:flex;gap:15px;flex-wrap:wrap}
-.nav a{color:white;text-decoration:none;font-weight:bold}
-.container{padding:15px;max-width:900px;margin:auto}
-.card{background:white;padding:15px;border-radius:8px;box-shadow:0 2px 5px rgba(0,0,0,0.1);margin-bottom:15px}
-input,select,button{padding:10px;margin:5px 0;width:100%;box-sizing:border-box}
-button{background:#1f2937;color:white;border:none;border-radius:5px;cursor:pointer}
-table{width:100%;border-collapse:collapse}
-th,td{border:1px solid #ddd;padding:8px;text-align:left}
-th{background:#1f2937;color:white}
-</style></head><body>
+body{font-family:system-ui,Arial;margin:0;background:#f3f5f7}
+.nav{background:#0f2f3c;color:#fff;padding:14px 20px;display:flex;gap:18px;flex-wrap:wrap}
+.nav a{color:#b7d1db;text-decoration:none}.nav a.active{color:#fff;font-weight:600}
+.card{background:#fff;border-radius:14px;padding:16px;margin:12px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.stat h1{margin:0;font-size:28px}
+.btn{background:#0f2f3c;color:#fff;border:0;padding:10px 14px;border-radius:8px}
+input,select{width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;margin:6px 0}
+table{width:100%;border-collapse:collapse}th{background:#0f2f3c;color:#fff;padding:8px}td{padding:8px;border-bottom:1px solid #eee}
+.badge{padding:3px 8px;border-radius:20px;font-size:12px}.in{background:#e6f7ed;color:#0a7a33}.out{background:#fff3cd;color:#8a6d00}
+</style>
+</head>
+<body>
 <div class="nav">
-<a href="/">Home</a>
-<a href="/deposit">Deposit</a>
-<a href="/overdue">Overdue</a>
+<a href="/" class="{{'active' if page=='dash'}}">Mortuary Tracking System</a>
+<a href="/" class="{{'active' if page=='dash'}}">Dashboard</a>
+<a href="/records">Records</a>
+<a href="/deposit">+ Deposit</a>
+<a href="/audit">Audit log</a>
 <a href="/users">Users</a>
-<a href="/my-account">My Account</a>
-<a href="/logout">Logout</a>
+<a href="/export">Export CSV</a>
+<span style="margin-left:auto">{{session.username}} ({{session.role}}) <a href="/logout" style="color:#fff;border:1px solid #fff;padding:4px 10px;border-radius:20px">Log out</a></span>
 </div>
-<div class="container">{{content|safe}}</div>
-</body></html>
+{% block body %}{% endblock %}
+<script>if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}</script>
+</body>
+</html>
 """
 
+# --- ROUTES ---
 @app.route('/login', methods=['GET','POST'])
 def login():
+    init_db()
     if request.method=='POST':
-        u=request.form['username']; p=request.form['password']
-        db=get_db(); user=db.execute("SELECT * FROM users WHERE username=?",(u,)).fetchone()
-        if user and check_password_hash(user['password'], p):
-            resp=redirect('/')
-            resp.set_cookie('user_id', str(user['id']), max_age=86400*30)
-            return resp
-        return render_template_string(BASE_HTML, content="<div class='card'><h3>Login Failed</h3><a href='/login'>Try again</a></div>")
-    return render_template_string(BASE_HTML, content="""
-    <div class='card'><h2>Login - Mortuary System</h2>
-    <form method='post'><input name='username' placeholder='Username' required>
-    <input name='password' type='password' placeholder='Password' required>
-    <button>Login</button></form>
-    <p>Default: admin / admin123</p></div>""")
+        db=get_db()
+        u=db.execute("SELECT * FROM users WHERE username=?", (request.form['username'].strip().lower(),)).fetchone()
+        if u and check_password_hash(u['password'], request.form['password']):
+            session['user_id']=u['id']; session['username']=u['username']; session['role']=u['role']
+            log_action(f"Login {u['username']}")
+            return redirect('/')
+        return render_template_string("<p style='color:red;text-align:center'>Login Failed</p>"+BASE_HTML.replace("{% block body %}{% endblock %}","<div class=card><h3>Login</h3><form method=post><input name=username placeholder=Username><input name=password type=password placeholder=Password><button class=btn>Login</button></form></div>"), page='login')
+    return render_template_string(BASE_HTML.replace("{% block body %}{% endblock %}","<div class=card><h3>Login</h3><form method=post><input name=username placeholder=Username><input name=password type=password placeholder=Password><button class=btn>Login</button></form></div>"), page='login')
 
 @app.route('/logout')
 def logout():
-    r=redirect('/login'); r.delete_cookie('user_id'); return r
+    session.clear(); return redirect('/login')
 
 @app.route('/')
 @login_required
-def home():
+def dashboard():
+    init_db()
     db=get_db()
-    count=db.execute("SELECT COUNT(*) as c FROM bodies WHERE status='deposited'").fetchone()['c']
-    rows=db.execute("SELECT * FROM bodies WHERE status='deposited' ORDER BY id DESC").fetchall()
-    html=f"<div class='card'><h3>Capacity: {count} / {MAX_CAPACITY}</h3><p>Available: {MAX_CAPACITY-count}</p></div>"
-    html+="<div class='card'><h3>Deposited Bodies</h3><table><tr><th>ID</th><th>Name</th><th>Age</th><th>Date</th></tr>"
-    for r in rows:
-        html+=f"<tr><td>{r['id']}</td><td>{r['name']}</td><td>{r['age']}</td><td>{r['date_deposited']}</td></tr>"
-    html+="</table></div>"
-    return render_template_string(BASE_HTML, content=html)
+    total=db.execute("SELECT COUNT(*) FROM bodies WHERE status='in'").fetchone()[0]
+    this_month=db.execute("SELECT COUNT(*) FROM bodies WHERE deposited_date LIKE ?", (datetime.now().strftime("%Y-%m-")+"%",)).fetchone()[0]
+    released_month=db.execute("SELECT COUNT(*) FROM bodies WHERE released_date LIKE ?", (datetime.now().strftime("%Y-%m-")+"%",)).fetchone()[0]
+    overdue=db.execute("SELECT COUNT(*) FROM bodies WHERE status='in' AND julianday('now')-julianday(deposited_date) > 30").fetchone()[0]
+    # Last 14 days
+    days=[]
+    for i in range(14, -1, -1):
+        d=(datetime.now()-timedelta(days=i)).strftime("%Y-%m-%d")
+        dep=db.execute("SELECT COUNT(*) FROM bodies WHERE deposited_date=?", (d,)).fetchone()[0]
+        rel=db.execute("SELECT COUNT(*) FROM bodies WHERE released_date=?", (d,)).fetchone()[0]
+        days.append((d[5:], dep, rel))
+    longest=db.execute("SELECT * FROM bodies WHERE status='in' ORDER BY deposited_date ASC LIMIT 5").fetchall()
+    html=f"""
+    <div class=grid>
+      <div class="card stat"><h1>{total} / 100</h1>Currently stored ({total}% occupancy)</div>
+      <div class="card stat"><h1>{this_month}</h1>Deposited this month</div>
+      <div class="card stat"><h1>{released_month}</h1>Released this month</div>
+      <div class="card stat"><h1 style="color:{'red' if overdue>0 else 'green'}">{overdue}</h1>Over 30 days in store</div>
+    </div>
+    <div class=card><b>Last 14 days</b> (green=deposited, amber=released)<br><br>
+      <div style="display:flex;gap:4px;align-items:end;height:60px">
+      {"".join([f"<div style='flex:1;text-align:center'><div style='background:#2ecc71;height:{d[1]*10+4}px'></div><div style='background:#f1c40f;height:{d[2]*10+4}px;margin-top:2px'></div><small>{d[0]}</small></div>" for d in days])}
+      </div>
+    </div>
+    <div class=card><b>Longest in store</b><br>{"<br>".join([f"{r['full_name']} - {r['tag_no']} - {(datetime.now()-datetime.strptime(r['deposited_date'],'%Y-%m-%d')).days} days" for r in longest]) if longest else "No bodies in store."}</div>
+    """
+    return render_template_string(BASE_HTML.replace("{% block body %}{% endblock %}", html), page='dash')
+
+@app.route('/users', methods=['GET','POST'])
+@login_required
+def users():
+    db=get_db()
+    if request.method=='POST' and session['role']=='admin':
+        try:
+            db.execute("INSERT INTO users (username,password,role) VALUES (?,?,?)",
+                       (request.form['username'].strip().lower(), generate_password_hash(request.form['password']), request.form['role']))
+            db.commit(); log_action(f"Created user {request.form['username']}")
+        except: pass
+    users=db.execute("SELECT id,username,role FROM users").fetchall()
+    rows="".join([f"<tr><td>{u['id']}</td><td>{u['username']}</td><td>{u['role']}</td></tr>" for u in users])
+    html=f"""
+    <div class=card><h3>Create User (e.g. Tamale)</h3>
+    <form method=post><input name=username placeholder="username e.g. korlebu" required>
+    <input name=password placeholder="password" required>
+    <select name=role><option>staff</option><option>admin</option></select>
+    <button class=btn>Create User</button></form></div>
+    <div class=card><table><tr><th>ID</th><th>Username</th><th>Role</th></tr>{rows}</table>
+    <p><small>Default: korlebu/korlebu123, tamale/tamale123, accra/accra123</small></p></div>
+    """
+    return render_template_string(BASE_HTML.replace("{% block body %}{% endblock %}", html), page='users')
 
 @app.route('/deposit', methods=['GET','POST'])
 @login_required
 def deposit():
     if request.method=='POST':
         db=get_db()
-        cnt=db.execute("SELECT COUNT(*) as c FROM bodies WHERE status='deposited'").fetchone()['c']
-        if cnt>=MAX_CAPACITY:
-            return render_template_string(BASE_HTML, content="<div class='card'><h3>Mortuary Full! Max 100000 reached</h3></div>")
-        db.execute("INSERT INTO bodies (name,age,gender,date_deposited,deposited_by) VALUES (?,?,?,?,?)",
-                   (request.form['name'], request.form['age'], request.form['gender'],
-                    datetime.now().strftime("%Y-%m-%d %H:%M"), current_user()['username']))
-        db.commit(); return redirect('/')
-    return render_template_string(BASE_HTML, content="""
-    <div class='card'><h3>Deposit Body</h3><form method='post'>
-    <input name='name' placeholder='Full Name' required>
-    <input name='age' type='number' placeholder='Age' required>
-    <select name='gender'><option>Male</option><option>Female</option></select>
-    <button>Deposit</button></form></div>""")
+        db.execute("INSERT INTO bodies (tag_no,full_name,sex,age,case_type,deposited_date,status,deposited_by,hospital) VALUES (?,?,?,?,?,?,?,?,?)",
+                   (request.form['tag'], request.form['name'], request.form['sex'], request.form['age'], request.form['case'], datetime.now().strftime("%Y-%m-%d"), 'in', session['username'], session['username']))
+        db.commit(); log_action(f"Deposited {request.form['name']}")
+        return redirect('/')
+    html="""<div class=card><h3>+ Deposit Body</h3><form method=post>
+    <input name=tag placeholder="Tag No" required><input name=name placeholder="Full Name" required>
+    <select name=sex><option>Male</option><option>Female</option></select>
+    <input name=age placeholder=Age><input name=case placeholder="Case Type e.g. Accident">
+    <button class=btn>Deposit</button></form></div>"""
+    return render_template_string(BASE_HTML.replace("{% block body %}{% endblock %}", html), page='deposit')
 
-@app.route('/overdue')
+@app.route('/records')
 @login_required
-def overdue():
+def records():
+    db=get_db(); q=request.args.get('q','')
+    if q:
+        rows=db.execute("SELECT * FROM bodies WHERE full_name LIKE ? OR tag_no LIKE ? ORDER BY id DESC", (f"%{q}%", f"%{q}%")).fetchall()
+    else:
+        rows=db.execute("SELECT * FROM bodies ORDER BY id DESC LIMIT 100").fetchall()
+    tr="".join([f"<tr><td>{r['tag_no']}</td><td>{r['full_name']}</td><td>{r['status']}</td><td>{r['deposited_date']}</td><td><a href='/release/{r['id']}'>Release</a></td></tr>" for r in rows])
+    html=f"""<div class=card><form><input name=q value="{q}" placeholder="Search name or tag"><button class=btn>Search</button></form></div>
+    <div class=card><table><tr><th>Tag</th><th>Name</th><th>Status</th><th>Date</th><th>Action</th></tr>{tr}</table></div>"""
+    return render_template_string(BASE_HTML.replace("{% block body %}{% endblock %}", html), page='records')
+
+@app.route('/release/<int:id>')
+@login_required
+def release(id):
     db=get_db()
-    rows=db.execute("SELECT * FROM bodies WHERE status='deposited'").fetchall()
-    html="<div class='card'><h3>Overdue Check (> 6 months)</h3><table><tr><th>ID</th><th>Name</th><th>Date</th></tr>"
-    for r in rows:
-        try:
-            d=datetime.strptime(r['date_deposited'], "%Y-%m-%d %H:%M")
-            if datetime.now()-d > timedelta(days=180):
-                html+=f"<tr><td>{r['id']}</td><td>{r['name']}</td><td>{r['date_deposited']}</td></tr>"
-        except: pass
-    html+="</table></div>"
-    return render_template_string(BASE_HTML, content=html)
+    db.execute("UPDATE bodies SET status='out', released_date=?, released_by=? WHERE id=?", (datetime.now().strftime("%Y-%m-%d"), session['username'], id))
+    db.commit(); log_action(f"Released body {id}")
+    return redirect('/records')
 
-@app.route('/users', methods=['GET','POST'])
+@app.route('/audit')
 @login_required
-def users():
-    db=get_db(); me=current_user()
-    if me['role']!='admin':
-        return render_template_string(BASE_HTML, content="<div class='card'><h3>Only Admin can manage users</h3></div>")
-    if request.method=='POST':
-        if 'new_username' in request.form:
-            try:
-                db.execute("INSERT INTO users (username,password,role) VALUES (?,?,?)",
-                           (request.form['new_username'], generate_password_hash(request.form['new_password']), request.form['role']))
-                db.commit()
-            except: pass
-        return redirect('/users')
-    users=db.execute("SELECT * FROM users").fetchall()
-    html="<div class='card'><h3>Create User (e.g. Tamale)</h3><form method='post'>"
-    html+="<input name='new_username' placeholder='Username e.g. tamale' required>"
-    html+="<input name='new_password' placeholder='Password' required>"
-    html+="<select name='role'><option value='user'>User</option><option value='admin'>Admin</option></select>"
-    html+="<button>Create User</button></form></div><div class='card'><table><tr><th>ID</th><th>Username</th><th>Role</th></tr>"
-    for u in users: html+=f"<tr><td>{u['id']}</td><td>{u['username']}</td><td>{u['role']}</td></tr>"
-    html+="</table></div>"
-    return render_template_string(BASE_HTML, content=html)
+def audit():
+    db=get_db(); rows=db.execute("SELECT * FROM audit ORDER BY id DESC LIMIT 100").fetchall()
+    tr="".join([f"<tr><td>{r['timestamp']}</td><td>{r['user']}</td><td>{r['action']}</td></tr>" for r in rows])
+    return render_template_string(BASE_HTML.replace("{% block body %}{% endblock %}", f"<div class=card><table><tr><th>Time</th><th>User</th><th>Action</th></tr>{tr}</table></div>"), page='audit')
 
-@app.route('/my-account', methods=['GET','POST'])
+@app.route('/export')
 @login_required
-def my_account():
-    db=get_db(); me=current_user(); msg=""
-    if request.method=='POST':
-        if 'new_username' in request.form:
-            if check_password_hash(me['password'], request.form['current_password']):
-                try:
-                    db.execute("UPDATE users SET username=? WHERE id=?",(request.form['new_username'], me['id'])); db.commit()
-                    msg="Username updated!"
-                except: msg="Username exists!"
-            else: msg="Wrong current password!"
-        if 'new_pass' in request.form:
-            if check_password_hash(me['password'], request.form['current_password2']):
-                db.execute("UPDATE users SET password=? WHERE id=?",(generate_password_hash(request.form['new_pass']), me['id'])); db.commit()
-                msg="Password updated!"
-            else: msg="Wrong current password!"
-    return render_template_string(BASE_HTML, content=f"""
-    <div class='card'><h2>My Account - {me['username']} ({me['role']})</h2><p style='color:green'>{msg}</p></div>
-    <div class='card'><h3>Change Username</h3><form method='post'>
-    <input name='new_username' placeholder='New Username' required>
-    <input name='current_password' type='password' placeholder='Current Password' required>
-    <button>Update Username</button></form></div>
-    <div class='card'><h3>Change Password</h3><form method='post'>
-    <input name='current_password2' type='password' placeholder='Current Password' required>
-    <input name='new_pass' type='password' placeholder='New Password' required>
-    <button>Update Password</button></form></div>""")
+def export():
+    db=get_db(); rows=db.execute("SELECT * FROM bodies").fetchall()
+    csv="tag_no,full_name,sex,age,case_type,deposited_date,status\n"
+    for r in rows: csv+=f"{r['tag_no']},{r['full_name']},{r['sex']},{r['age']},{r['case_type']},{r['deposited_date']},{r['status']}\n"
+    return Response(csv, mimetype='text/csv', headers={"Content-Disposition":"attachment;filename=mortuary.csv"})
 
-init_db()
 if __name__=='__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT',10000)))
+    with app.app_context(): init_db()
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT',10000))) 
