@@ -106,6 +106,18 @@ def before_request():
         init_db()
     except:
         pass
+def icon512():
+    try:
+        return send_from_directory('.', 'icon-512.png')
+    except:
+        return "", 204
+
+@app.before_request
+def before_request():
+    try:
+        init_db()
+    except:
+        pass
 
 
 
