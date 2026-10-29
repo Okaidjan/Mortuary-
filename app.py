@@ -5,7 +5,7 @@ from flask import Flask, render_template_string, request, redirect, session, g, 
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "mortuary-pro-2026-secure-key-ghana")
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "mortuary-pro-2026-ghana")
 DATABASE = "mortuary.db"
 CAPACITY = 100000
 
@@ -139,17 +139,13 @@ def dashboard():
     month_start=datetime.now().replace(day=1).strftime("%Y-%m-%d")
     dep_month=db.execute("SELECT COUNT(*) c FROM bodies WHERE date(date_in)>=?",(month_start,)).fetchone()['c']
     rel_month=db.execute("SELECT COUNT(*) c FROM bodies WHERE status='Released' AND date(date_out)>=?",(month_start,)).fetchone()['c']
-    
-    # Last 14 days
     days=[]
     for i in range(14, -1, -1):
         d=(datetime.now()-timedelta(days=i)).strftime("%Y-%m-%d")
         short=(datetime.now()-timedelta(days=i)).strftime("%m-%d")
         cnt=db.execute("SELECT COUNT(*) c FROM bodies WHERE date(date_in)=?",(d,)).fetchone()['c']
         days.append((short,cnt))
-    
     longest=db.execute("SELECT * FROM bodies WHERE status='Deposited' ORDER BY date_in ASC LIMIT 1").fetchone()
-    
     content=f"""
     <div class="stats">
         <div class="card stat"><h2>{total} / {CAPACITY}</h2><p>Currently stored ({occupancy:.2f}% occupancy)</p></div>
@@ -199,9 +195,35 @@ def records():
     if 'username' not in session: return redirect('/login')
     db=get_db()
     rows=db.execute("SELECT * FROM bodies ORDER BY id DESC").fetchall()
-    rows_html="".join([f"<tr><td><span class='tag'>{r['tag_no']}</span></td><td>{r['full_name']}</td><td>{r['sex']}</td><td>{r['status']}</td><td>{r['date_in']}</td><td><a href='/release/{r['id']}'>Release</a></td></tr>" for r in rows])
-    content=f"<div class='card'><table><tr><th>Tag</th><th>Name</th><th>Sex</th><th>Status</th><th>Date In</th><th>Action</th></tr>{rows_html}</table></div>"
+    rows_html="".join([f"<tr><td><span class='tag'>{r['tag_no']}</span></td><td>{r['full_name']}</td><td>{r['sex']}</td><td>{r['status']}</td><td>{r['date_in'][:16]}</td><td><a href='/receipt/{r['id']}' target='_blank'>Receipt</a> | <a href='/release/{r['id']}'>Release</a></td></tr>" for r in rows])
+    content=f"<div class='card'><div style='display:flex;justify-content:space-between'><b>All Records</b><input id='q' placeholder='Search name/tag' onkeyup='search()' style='width:150px'></div><table id='tbl'><tr><th>Tag</th><th>Name</th><th>Sex</th><th>Status</th><th>Date In</th><th>Action</th></tr>{rows_html}</table></div><script>function search(){{var q=document.getElementById('q').value.toLowerCase();var tr=document.querySelectorAll('#tbl tr');for(var i=1;i<tr.length;i++){{tr[i].style.display=tr[i].innerText.toLowerCase().includes(q)?'':'none'}}}}</script>"
     return render_template_string(BASE_HTML, content=content, page='records')
+
+@app.route('/receipt/<int:bid>')
+def receipt(bid):
+    if 'username' not in session: return redirect('/login')
+    db=get_db()
+    r=db.execute("SELECT * FROM bodies WHERE id=?", (bid,)).fetchone()
+    if not r: return "Not found"
+    qr_url=f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={r['tag_no']}-{r['full_name']}"
+    return render_template_string(f"""
+    <html><head><title>Receipt {r['tag_no']}</title><style>
+    body{{font-family:Arial;padding:20px;max-width:600px;margin:auto}} .header{{text-align:center;border-bottom:3px double #000;padding-bottom:10px}}
+    .coat{{font-size:50px}} table{{width:100%;margin-top:20px}} td{{padding:8px;border-bottom:1px solid #ddd}}
+    .tag{{background:#111;color:#0f0;padding:4px 8px;font-family:monospace}} @media print{{button{{display:none}}}}
+    </style></head><body>
+    <div class="header"><div class="coat">&#127468;&#127469;</div><h3>REPUBLIC OF GHANA<br>MINISTRY OF HEALTH</h3><p>Mortuary Deposit Receipt</p></div>
+    <table><tr><td><b>Tag No</b></td><td><span class="tag">{r['tag_no']}</span></td><td rowspan="6"><img src="{qr_url}"><br><small>Scan to verify</small></td></tr>
+    <tr><td>Full Name</td><td>{r['full_name']}</td></tr>
+    <tr><td>Sex / Age</td><td>{r['sex']} / {r['age']}</td></tr>
+    <tr><td>Case Type</td><td>{r['case_type']}</td></tr>
+    <tr><td>Deposited By</td><td>{r['deposited_by']}</td></tr>
+    <tr><td>Hospital</td><td>{r['hospital']}</td></tr>
+    <tr><td>Date In</td><td>{r['date_in']}</td></tr>
+    <tr><td>Status</td><td>{r['status']}</td></tr>
+    </table><br><p>Official Stamp / Signature: ___________________</p><br><button onclick="window.print()" style="width:100%;padding:12px;background:#0f2a3c;color:#fff;border:0">Print Receipt</button>
+    </body></html>
+    """)
 
 @app.route('/release/<int:bid>')
 def release(bid):
