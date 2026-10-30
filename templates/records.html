@@ -1,0 +1,9 @@
+<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Records</title>
+<style>body{margin:0;font-family:sans-serif;background:#f1f5f9} .nav{background:#1e293b;color:#fff;padding:10px 14px;display:flex;gap:12px;flex-wrap:wrap;font-size:13px} .nav a{color:#cbd5e1;text-decoration:none} table{width:100%;border-collapse:collapse;font-size:13px} th,td{padding:8px;border-bottom:1px solid #e2e8f0;text-align:left} .card{background:#fff;margin:14px;padding:14px;border-radius:10px} input{padding:8px;border-radius:6px;border:1px solid #cbd5e1}</style></head><body>
+<div class="nav"><b>Mortuary</b> <a href="/">Dashboard</a> <a href="/records" style="color:#38bdf8">Records</a> <a href="/deposit">+Deposit</a> <a href="/audit">Audit log</a> <a href="/users">Users</a> <a href="/export/csv">Export CSV</a> <a href="/settings">Settings</a> <a href="/logout">Logout</a></div>
+<div class="card">
+<form method="GET"><input name="q" value="{{ q }}" placeholder="Search name or tag"><button>Search</button></form><br>
+<table><tr><th>Tag ID</th><th>Name</th><th>Storage</th><th>Status</th><th>Fee/Bal</th></tr>
+{% for b in bodies %}<tr><td><a href="/body/{{ b['id'] }}">{{ b['id'] }}</a></td><td>{{ b['name'] }}</td><td>{{ b['storage_id'] }}</td><td>{{ b['status'] }}</td><td>GHS {{ b['total_fee'] }}/{{ b['balance'] }}</td></tr>{% endfor %}
+</table>{% if not bodies %}<p>No records</p>{% endif %}
+</div></body></html>
