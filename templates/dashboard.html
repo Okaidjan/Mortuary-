@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html><head><title>Mortuary Pro v2</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#111827">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>body{margin:0;background:#0f172a;color:white;font-family:sans-serif}.header{background:#111827;padding:12px;display:flex;justify-content:space-between}.cards{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;padding:15px}.card{background:#1e293b;padding:15px;border-radius:10px}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #334155;font-size:13px}input,select{padding:8px;border-radius:5px;border:0;margin:3px}button{padding:8px 12px;border-radius:5px;border:0;background:#2563eb;color:white}</style>
+</head><body>
+<div class="header"><span>Pro v2 - {{current_hospital}} | Free: {{storage_available}}</span><span><a href="/reports" style="color:#60a5fa">Reports</a> | <a href="/logout" style="color:white">Logout</a></span></div>
+<div class="cards"><div class="card"><h2>{{total}} / {{capacity}}</h2><small>Occupancy</small></div><div class="card"><h2>{{deposited}}</h2><small>Deposited</small></div><div class="card"><h2>{{released}}</h2><small>Released</small></div><div class="card"><h2>GHS {{total_revenue}}</h2><small>Revenue</small></div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:15px"><div style="background:#1e293b;padding:15px;border-radius:10px"><canvas id="chart" height="120"></canvas></div><div style="background:#1e293b;padding:15px;border-radius:10px"><canvas id="rev" height="120"></canvas></div></div>
+<div style="padding:15px;background:#1e293b;margin:15px;border-radius:10px"><h3>Add Body + Kin + Auto QR</h3><form method="POST" action="/add"><input name="name" placeholder="Deceased Name" required><input name="age" placeholder="Age" style="width:60px"><select name="gender"><option>Male</option><option>Female</option></select><input name="cause" placeholder="Cause"><br><small>Next of Kin:</small><br><input name="kin_name" placeholder="Kin Name" required><input name="kin_phone" placeholder="Kin Phone (SMS)" required><input name="kin_rel" placeholder="Relationship"><input name="kin_id" placeholder="Ghana Card"><button>Deposit + QR + Bill + SMS</button></form></div>
+<div style="padding:15px"><h3>Recent - Click ID for QR/Bill/Release</h3><table><tr><th>Tag</th><th>Name</th><th>Storage</th><th>Hospital</th><th>Status</th><th>Action</th></tr>{% for b in bodies %}<tr><td><a href="/body/{{b.id}}" style="color:#60a5fa">{{b.id}}</a></td><td>{{b.name}}</td><td>{{b.storage_id}}</td><td>{{b.hospital}}</td><td>{{b.status}}</td><td><a href="/body/{{b.id}}" style="color:#60a5fa">QR/Bill/Release</a></td></tr>{% endfor %}</table></div>
+<script>
+new Chart(document.getElementById('chart'),{type:'line',data:{labels:{{days|tojson}},[STRIPPED] / day',data:{{counts|tojson}},[STRIPPED] GHS',data:{{revenue|tojson}},[STRIPPED]
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/static/sw.js')}
+</script></body></html>
