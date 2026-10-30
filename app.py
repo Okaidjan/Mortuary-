@@ -1,13 +1,11 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-import os
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'moh-kbth-2026-stable-key'
+app.config['SECRET_KEY'] = 'moh-kbth-2026-final'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mortuary.db'
-
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
@@ -25,6 +23,18 @@ class Deceased(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+def login_page(msg=""):
+    return f"""
+    <html><body style="font-family:sans-serif; padding:40px; max-width:400px; margin:auto">
+    <h2>KBTH Mortuary Login</h2>
+    <p style="color:red">{msg}</p>
+    <form method="POST">
+    <input name="username" placeholder="Username" value="admin" style="width:100%;padding:10px;margin:5px 0"><br>
+    <input name="password" type="password" placeholder="Password" style="width:100%;padding:10px;margin:5px 0"><br>
+    <button type="submit" style="width:100%;padding:10px;background:#004d40;color:white">Login</button>
+    </form></body></html>
+    """
+
 @app.route('/')
 def index():
     return redirect(url_for('dashboard') if current_user.is_authenticated else url_for('login'))
@@ -38,14 +48,21 @@ def login():
         if user and check_password_hash(user.password_hash, p):
             login_user(user)
             return redirect(url_for('dashboard'))
-        flash('Invalid username or password')
-    return render_template('login.html')
+        return login_page("Invalid username or password")
+    return login_page()
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
     items = Deceased.query.all()
-    return render_template('dashboard.html', deceased_list=items)
+    return f"""
+    <html><body style="font-family:sans-serif; padding:20px">
+    <h2>Korle-Bu Mortuary Dashboard</h2>
+    <p>Logged in as {current_user.username} | <a href="/logout">Logout</a></p>
+    <h3>Total: {len(items)} / 100000</h3>
+    <p>✅ System is LIVE for MOH Ghana</p>
+    </body></html>
+    """
 
 @app.route('/logout')
 @login_required
