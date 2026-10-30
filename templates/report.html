@@ -1,0 +1,7 @@
+<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reports</title>
+<style>body{background:#0f172a;color:#fff;font-family:sans-serif;padding:16px} .card{background:#1e293b;padding:16px;border-radius:12px;margin-bottom:12px} table{width:100%;border-collapse:collapse;font-size:12px} th,td{padding:6px;border-bottom:1px solid #334155;text-align:left} a{color:#38bdf8}</style></head><body>
+<a href="/">← Dashboard</a> | <a href="/audit">Full Audit</a> | <a href="/export/excel" style="color:#4ade80">Export Excel</a>
+<div class="card"><h2>Reports - {{ current_hospital }}</h2><p>Total Bodies: {{ total }} | Revenue: GHS {{ total_rev }}</p></div>
+<div class="card"><h3>Recent Audit (100)</h3><table><tr><th>Time</th><th>User</th><th>Action</th><th>Tag</th><th>Details</th></tr>
+{% for a in audits %}<tr><td>{{ a['time'] }}</td><td>{{ a['user'] }}</td><td>{{ a['action'] }}</td><td>{{ a['tag_id'] }}</td><td>{{ a['details'] }}</td></tr>{% endfor %}
+</table></div></body></html>
