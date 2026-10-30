@@ -1,0 +1,7 @@
+<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Audit Trail</title>
+<style>body{background:#0f172a;color:#fff;font-family:sans-serif;padding:16px} .card{background:#1e293b;padding:16px;border-radius:12px} table{width:100%;border-collapse:collapse;font-size:12px} th,td{padding:6px;border-bottom:1px solid #334155;text-align:left} a{color:#38bdf8}</style></head><body>
+<a href="/">← Dashboard</a> | <a href="/reports">Reports</a> | <a href="/export/excel" style="color:#4ade80">Export Excel</a>
+<div class="card"><h2>Full Audit Trail - Tamper Proof</h2><p style="color:#94a3b8;font-size:12px">Every login, deposit, payment, release, settings change is logged. Ghana Health Service compliant.</p>
+<table><tr><th>Time</th><th>User</th><th>Action</th><th>Tag</th><th>Details</th></tr>
+{% for a in audits %}<tr><td>{{ a['time'] }}</td><td>{{ a['user'] }}</td><td style="color:#fbbf24">{{ a['action'] }}</td><td>{{ a['tag_id'] }}</td><td>{{ a['details'] }}</td></tr>{% endfor %}
+</table></div></body></html>
