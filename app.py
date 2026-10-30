@@ -3,7 +3,7 @@ from flask import Flask, request, redirect, session, Response
 from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = "mortuary-v3-fixed-2026"
+app.secret_key = "mortuary-final-100000"
 DB = "mortuary.db"
 ADMISSION = 100
 DAILY = 50
@@ -42,7 +42,7 @@ def free_storage():
     c=get_db()
     used=[r[0] for r in c.execute("SELECT storage_id FROM bodies WHERE status!='Released'").fetchall()]
     c.close()
-    for i in range(1,100000):
+    for i in range(1,100001):
         sid="F"+str((i//100)+1).zfill(2)+"-S"+str((i%100)+1).zfill(3)
         if sid not in used:
             return sid
@@ -97,7 +97,7 @@ def dash():
     recent_rows=""
     for b in recent:
         recent_rows+="<tr><td><a href='/body/"+b['id']+"'>"+b['id']+"</a></td><td>"+(b['name'] or '')+"</td><td>"+(b['storage_id'] or '')+"</td></tr>"
-    return page("Dashboard", alert+"<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:12px'><div class='card'><b style='font-size:22px'>"+str(total)+" / 100k</b><br><small>In storage</small></div><div class='card'><b style='font-size:22px'>"+str(dep_today)+"</b><br><small>Today in</small></div><div class='card'><b style='font-size:22px'>GHS "+str(revenue)+"</b><br><small>Revenue</small></div></div><div class='card'><h3>Recent Deposits</h3><table><tr><th>Tag</th><th>Name</th><th>Storage</th></tr>"+recent_rows+"</table></div><div class='card'><a href='/deposit'><button class='btn'>+ Deposit</button></a> <a href='/records'><button>View All Records</button></a></div>")
+    return page("Dashboard", alert+"<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:12px'><div class='card'><b style='font-size:22px'>"+str(total)+" / 100000</b><br><small>Currently stored</small></div><div class='card'><b style='font-size:22px'>"+str(dep_today)+"</b><br><small>Today in</small></div><div class='card'><b style='font-size:22px'>GHS "+str(revenue)+"</b><br><small>Revenue</small></div></div><div class='card'><h3>Recent Deposits</h3><table><tr><th>Tag</th><th>Name</th><th>Storage</th></tr>"+recent_rows+"</table></div><div class='card'><a href='/deposit'><button class='btn'>+ Deposit</button></a> <a href='/records'><button>View All Records</button></a></div>")
 
 @app.route('/records')
 def records():
