@@ -1,1 +1,13 @@
-<!DOCTYPE html><html><head><title>Login</title><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="manifest" href="/static/manifest.json"><style>body{background:#111827;color:white;display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif}.box{background:#1f2937;padding:30px;border-radius:10px;width:300px}input{width:100%;padding:10px;margin:8px 0;border-radius:5px;border:0}button{width:100%;padding:10px;background:#2563eb;color:white;border:0;border-radius:5px}</style></head><body><div class="box"><h3>Mortuary Pro v2</h3><form method="POST"><input name="username" placeholder="Username"><input name="password" type="password" placeholder="Password"><button>Login</button></form><p style="font-size:12px;color:#9ca3af">admin / admin123</p></div></body></html>
+<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Login - Mortuary Pro</title>
+<style>body{background:#0f172a;color:#fff;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}.card{background:#1e293b;padding:28px;border-radius:16px;width:90%;max-width:360px;box-shadow:0 10px 30px rgba(0,0,0,.5)}input{width:100%;padding:12px;margin:8px 0;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#fff;box-sizing:border-box}button{width:100%;padding:12px;background:#0ea5e9;border:none;border-radius:8px;color:#fff;font-weight:bold;margin-top:10px} .err{background:#7f1d1d;padding:8px;border-radius:6px;margin-bottom:8px;font-size:13px}</style></head><body>
+<div class="card">
+<h2 style="margin:0 0 10px">Mortuary Pro V4</h2>
+<p style="color:#94a3b8;font-size:13px;margin-top:0">Secure login</p>
+{% if error %}<div class="err">{{ error }}</div>{% endif %}
+<form method="POST">
+<input type="text" name="username" placeholder="Username" required>
+<input type="password" name="password" placeholder="Password" required>
+<button type="submit">Login</button>
+</form>
+<p style="color:#475569;font-size:11px;margin-top:12px;text-align:center">Ghana Mortuary Management</p>
+</div></body></html>
