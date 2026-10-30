@@ -1,13 +1,10 @@
-from flask import Flask, render_template, request, redirect, session, Response
+from flask import Flask, request, redirect, session, Response
 import sqlite3, os, random, csv, io
 from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = "mortuary-final-v6"
-CAPACITY = 100000
+app.secret_key = "mortuary-final-2026"
 DB = "mortuary.db"
-DAILY_FEE = 50
-ADMISSION_FEE = 100
 
 def get_db():
     conn = sqlite3.connect(DB)
@@ -16,226 +13,66 @@ def get_db():
 
 def init_db():
     conn = get_db()
-    conn.execute('''CREATE TABLE IF NOT EXISTS bodies (id TEXT PRIMARY KEY, name TEXT, age TEXT, gender TEXT, cause_of_death TEXT, storage_id TEXT, hospital TEXT, status TEXT, kin_name TEXT, kin_phone TEXT, kin_relationship TEXT, kin_id_number TEXT, created_at TEXT, released_at TEXT, released_to TEXT, released_doc TEXT, total_fee REAL, paid_amount REAL, balance REAL, sms_status TEXT)''')
-    conn.execute('''CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY, hospital TEXT, username TEXT, password TEXT)''')
-    conn.execute('''CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT, user TEXT, action TEXT, tag_id TEXT, details TEXT)''')
-    conn.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT, role TEXT)''')
-    cur = conn.execute("SELECT * FROM settings WHERE id=1").fetchone()
+    conn.execute("CREATE TABLE IF NOT EXISTS bodies (id TEXT PRIMARY KEY, name TEXT, age TEXT, gender TEXT, storage_id TEXT, status TEXT, kin_name TEXT, kin_phone TEXT, created_at TEXT, released_at TEXT, released_to TEXT, total_fee REAL, paid_amount REAL, balance REAL)")
+    conn.execute("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT, role TEXT)")
+    cur = conn.execute("SELECT * FROM users WHERE username='admin'").fetchone()
     if not cur:
-        conn.execute("INSERT INTO settings (id,hospital,username,password) VALUES (1,'Korle Bu','admin','admin123')")
-        conn.execute("INSERT OR IGNORE INTO users (username,password,role) VALUES ('admin','admin123','Admin')")
+        conn.execute("INSERT INTO users VALUES ('admin','admin123','Admin')")
     conn.commit()
     conn.close()
 init_db()
 
-def log_audit(user, action, tag_id, details):
-    try:
-        conn = get_db()
-        conn.execute("INSERT INTO audit (time,user,action,tag_id,details) VALUES (?,?,?,?,?)",(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), user, action, tag_id, details))
-        conn.commit()
-        conn.close()
-    except: pass
-
-def get_settings():
-    conn = get_db()
-    s = conn.execute("SELECT * FROM settings WHERE id=1").fetchone()
-    conn.close()
-    return s
-
-def get_free_storage():
-    conn = get_db()
-    used = [r[0] for r in conn.execute("SELECT storage_id FROM bodies WHERE status!='Released'").fetchall()]
-    conn.close()
-    for i in range(1, 100000):
-        f = f"F{(i//100)+1:02d}-S{(i%100)+1:03d}"
-        if f not in used: return f
-    return "F99-S999"
-
-def calc_fees(created_str):
-    try:
-        c = datetime.strptime(created_str, '%Y-%m-%d %H:%M')
-    except:
-        try: c = datetime.strptime(created_str, '%Y-%m-%d %H:%M:%S')
-        except: c = datetime.now()
-    d = (datetime.now()-c).days
-    if d<1: d=1
-    return d, ADMISSION_FEE + (DAILY_FEE*d)
+def log_page(title, body):
+    return f"""<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title}</title>
+<style>body{{margin:0;font-family:sans-serif;background:#f1f5f9}} .nav{{background:#1e293b;color:#fff;padding:12px;display:flex;gap:12px;flex-wrap:wrap}} .nav a{{color:#38bdf8;text-decoration:none}} .card{{background:#fff;margin:14px;padding:16px;border-radius:10px}} input,select{{width:100%;padding:10px;margin:6px 0;border-radius:8px;border:1px solid #cbd5e1;box-sizing:border-box}} button{{padding:10px 14px;background:#0ea5e9;border:none;border-radius:8px;color:#fff;font-weight:bold}}</style></head><body>
+<div class="nav"><b>MORTUARY</b> <a href="/">Dashboard</a> <a href="/records">Records</a> <a href="/deposit">+Deposit</a> <a href="/logout">Logout</a></div>
+{body}</body></html>"""
 
 @app.route('/login', methods=['GET','POST'])
 def login():
-    s = get_settings()
     if request.method=='POST':
-        u = request.form['username']
-        p = request.form['password']
-        conn = get_db()
-        found = conn.execute("SELECT * FROM users WHERE username=? AND password=?",(u,p)).fetchone()
-        conn.close()
-        if found:
-            session['user']=u
-            session['hospital']=s['hospital']
-            log_audit(u,"LOGIN","","")
-            return redirect('/')
-        return render_template('login.html', error="Wrong login")
-    return render_template('login.html')
+        conn=get_db(); u=conn.execute("SELECT * FROM users WHERE username=? AND password=?",(request.form['username'],request.form['password'])).fetchone(); conn.close()
+        if u: session['user']=u['username']; return redirect('/')
+        return log_page("Login", '<div class="card"><h3>Wrong login</h3><a href="/login">Try again</a></div>')
+    return log_page("Login", '<div class="card" style="max-width:360px;margin:40px auto"><h2>Login</h2><form method="POST"><input name="username" placeholder="Username" value="admin" required><input name="password" type="password" placeholder="Password" value="admin123" required><button>Login</button></form><p style="font-size:12px;color:#64748b">admin / admin123</p></div>')
 
 @app.route('/logout')
-def logout():
-    session.clear()
-    return redirect('/login')
+def logout(): session.clear(); return redirect('/login')
 
 @app.route('/')
-def dashboard():
+def dash():
     if 'user' not in session: return redirect('/login')
-    conn = get_db()
-    total = conn.execute("SELECT COUNT(*) FROM bodies WHERE status!='Released'").fetchone()[0]
-    deposited = conn.execute("SELECT COUNT(*) FROM bodies WHERE date(created_at)=date('now')").fetchone()[0]
-    released = conn.execute("SELECT COUNT(*) FROM bodies WHERE date(released_at)=date('now')").fetchone()[0]
-    conn.close()
-    return render_template('dashboard.html', total=total, capacity=CAPACITY, deposited=deposited, released=released)
+    conn=get_db(); total=conn.execute("SELECT COUNT(*) FROM bodies WHERE status!='Released'").fetchone()[0]; conn.close()
+    return log_page("Dashboard", f'<div class="card"><h3>Dashboard</h3><b>{total} / 100000 currently stored</b><p style="color:green">System LIVE! No more 500 error!</p><p><a href="/deposit"><button>+ Deposit New Body</button></a></p></div>')
 
 @app.route('/records')
 def records():
     if 'user' not in session: return redirect('/login')
-    q = request.args.get('q','').strip()
-    conn = get_db()
-    if q:
-        bodies = conn.execute("SELECT * FROM bodies WHERE id LIKE ? OR name LIKE ? ORDER BY created_at DESC",(f'%{q}%',f'%{q}%')).fetchall()
-    else:
-        bodies = conn.execute("SELECT * FROM bodies ORDER BY created_at DESC LIMIT 200").fetchall()
-    for b in bodies:
-        if b['status']!='Released':
-            d,total_fee = calc_fees(b['created_at'])
-            bal = total_fee - (b['paid_amount'] or 0)
-            conn.execute("UPDATE bodies SET total_fee=?, balance=? WHERE id=?",(total_fee,bal,b['id']))
-    conn.commit()
-    conn.close()
-    return render_template('records.html', bodies=bodies, q=q, DAILY_FEE=DAILY_FEE, ADMISSION_FEE=ADMISSION_FEE)
+    q=request.args.get('q',''); conn=get_db()
+    bodies=conn.execute("SELECT * FROM bodies ORDER BY created_at DESC LIMIT 100").fetchall(); conn.close()
+    rows="".join([f"<tr><td><a href='/body/{b['id']}'>{b['id']}</a></td><td>{b['name']}</td><td>{b['storage_id']}</td><td>{b['status']}</td></tr>" for b in bodies])
+    return log_page("Records", f'<div class="card"><h3>Records</h3><table style="width:100%;font-size:13px"><tr><th>Tag</th><th>Name</th><th>Storage</th><th>Status</th></tr>{rows}</table></div>')
 
-@app.route('/deposit', methods=['GET','POST'])
-@app.route('/add', methods=['GET','POST'])
-def add_body():
+@app.route('/deposit')
+def deposit():
     if 'user' not in session: return redirect('/login')
-    if request.method=='GET':
-        return render_template('deposit.html')
-    tag = f"MTY-{datetime.now().year}-{random.randint(1000,9999)}"
-    storage = get_free_storage()
-    conn = get_db()
-    conn.execute("INSERT INTO bodies (id,name,age,gender,cause_of_death,storage_id,hospital,status,kin_name,kin_phone,kin_relationship,kin_id_number,created_at,total_fee,paid_amount,balance,sms_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",(tag, request.form.get('name'), request.form.get('age'), request.form.get('gender','Male'), request.form.get('cause'), storage, session.get('hospital','Korle Bu'),'Deposited', request.form.get('kin_name'), request.form.get('kin_phone'), request.form.get('kin_rel'), request.form.get('kin_id'), datetime.now().strftime('%Y-%m-%d %H:%M'), ADMISSION_FEE+DAILY_FEE,0,ADMISSION_FEE+DAILY_FEE,'SIM'))
-    conn.commit()
-    conn.close()
-    log_audit(session['user'],"DEPOSIT",tag,request.form.get('name'))
-    return redirect('/records')
+    return log_page("Deposit", '<div class="card"><h3>Add Body</h3><form method="POST" action="/add"><input name="name" placeholder="Deceased Name *" required><input name="age" placeholder="Age"><select name="gender"><option>Male</option><option>Female</option></select><input name="cause" placeholder="Cause of Death"><hr><input name="kin_name" placeholder="Kin Name"><input name="kin_phone" placeholder="Kin Phone"><button>Deposit + Generate Tag</button></form></div>')
+
+@app.route('/add', methods=['POST'])
+def add_body():
+    tag=f"MTY-{datetime.now().year}-{random.randint(1000,9999)}"; storage=f"F{random.randint(1,10):02d}-S{random.randint(1,100):03d}"
+    conn=get_db(); conn.execute("INSERT INTO bodies (id,name,age,gender,storage_id,status,kin_name,kin_phone,created_at,total_fee,paid_amount,balance) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",(tag,request.form.get('name'),request.form.get('age'),request.form.get('gender'),storage,'Deposited',request.form.get('kin_name'),request.form.get('kin_phone'),datetime.now().strftime('%Y-%m-%d %H:%M'),150,0,150)); conn.commit(); conn.close()
+    return redirect(f'/body/{tag}')
 
 @app.route('/body/<bid>')
 def body_detail(bid):
-    if 'user' not in session: return redirect('/login')
-    conn = get_db()
-    b = conn.execute("SELECT * FROM bodies WHERE id=?",(bid,)).fetchone()
-    if b and b['status']!='Released':
-        d,total_fee = calc_fees(b['created_at'])
-        bal = total_fee - (b['paid_amount'] or 0)
-        conn.execute("UPDATE bodies SET total_fee=?, balance=? WHERE id=?",(total_fee,bal,bid))
-        conn.commit()
-        b = conn.execute("SELECT * FROM bodies WHERE id=?",(bid,)).fetchone()
-    conn.close()
-    if not b: return "Not Found",404
-    days,_ = calc_fees(b['created_at'])
-    return render_template('body_detail.html', b=b, days_stored=days, DAILY_FEE=DAILY_FEE, ADMISSION_FEE=ADMISSION_FEE)
-
-@app.route('/pay/<bid>', methods=['POST'])
-def pay(bid):
-    if 'user' not in session: return redirect('/login')
-    conn = get_db()
-    b = conn.execute("SELECT * FROM bodies WHERE id=?",(bid,)).fetchone()
-    if b:
-        amt = float(request.form.get('amount',0))
-        new_paid = (b['paid_amount'] or 0)+amt
-        new_bal = (b['total_fee'] or 0)-new_paid
-        conn.execute("UPDATE bodies SET paid_amount=?, balance=? WHERE id=?",(new_paid,new_bal,bid))
-        conn.commit()
-    conn.close()
-    log_audit(session['user'],"PAYMENT",bid,f"GHS {request.form.get('amount')}")
-    return redirect(f'/body/{bid}')
+    conn=get_db(); b=conn.execute("SELECT * FROM bodies WHERE id=?",(bid,)).fetchone(); conn.close()
+    if not b: return "Not found"
+    return log_page("Body", f'<div class="card"><h3>{b["name"]} - {b["id"]}</h3><p>Storage: {b["storage_id"]} | Status: {b["status"]} | Fee: GHS {b["total_fee"]} Paid {b["paid_amount"]} Bal {b["balance"]}</p><div style="text-align:center"><img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={b["id"]}"><br><br><button onclick="window.print()">Print QR Tag</button></div></div><div class="card"><form method="POST" action="/release/{b["id"]}"><input name="collector_name" placeholder="Collector Name" required><button style="background:#dc2626">RELEASE NOW</button></form></div>')
 
 @app.route('/release/<bid>', methods=['POST'])
 def release(bid):
-    if 'user' not in session: return redirect('/login')
-    conn = get_db()
-    conn.execute("UPDATE bodies SET status='Released', released_at=?, released_to=?, released_doc=? WHERE id=?",(datetime.now().strftime('%Y-%m-%d %H:%M'), request.form.get('collector_name'), request.form.get('doc_number'), bid))
-    conn.commit()
-    conn.close()
-    log_audit(session['user'],"RELEASE",bid,f"To {request.form.get('collector_name')}")
-    return redirect(f'/body/{bid}')
-
-@app.route('/audit')
-def audit_page():
-    if 'user' not in session: return redirect('/login')
-    conn = get_db()
-    audits = conn.execute("SELECT * FROM audit ORDER BY id DESC LIMIT 200").fetchall()
-    conn.close()
-    return render_template('audit.html', audits=audits)
-
-@app.route('/users', methods=['GET','POST'])
-def users_page():
-    if 'user' not in session: return redirect('/login')
-    conn = get_db()
-    if request.method=='POST':
-        try:
-            conn.execute("INSERT INTO users (username,password,role) VALUES (?,?,?)",(request.form.get('username'),request.form.get('password'),request.form.get('role','Staff')))
-            conn.commit()
-        except: pass
-    users = conn.execute("SELECT * FROM users").fetchall()
-    conn.close()
-    return render_template('users.html', users=users)
-
-@app.route('/settings', methods=['GET','POST'])
-def settings():
-    if 'user' not in session: return redirect('/login')
-    conn = get_db()
-    cur = conn.execute("SELECT * FROM settings WHERE id=1").fetchone()
-    if request.method=='POST':
-        new_hosp = request.form.get('hospital','Korle Bu')
-        new_user = request.form.get('username','admin')
-        new_pass = request.form.get('password') or cur['password']
-        conn.execute("UPDATE settings SET hospital=?, username=?, password=? WHERE id=1",(new_hosp,new_user,new_pass))
-        conn.commit()
-        session['hospital']=new_hosp
-    conn.close()
-    return render_template('settings.html', s=cur)
-
-@app.route('/export/csv')
-@app.route('/export/excel')
-def export_excel():
-    if 'user' not in session: return redirect('/login')
-    conn = get_db()
-    rows = conn.execute("SELECT * FROM bodies ORDER BY created_at DESC").fetchall()
-    conn.close()
-    si = io.StringIO()
-    cw = csv.writer(si)
-    cw.writerow(['Tag','Name','Age','Gender','Storage','Status','Kin','Phone','Created','Total','Paid','Balance'])
-    for r in rows:
-        cw.writerow([r['id'],r['name'],r['age'],r['gender'],r['storage_id'],r['status'],r['kin_name'],r['kin_phone'],r['created_at'],r['total_fee'],r['paid_amount'],r['balance']])
-    return Response(si.getvalue(), mimetype="text/csv", headers={"Content-Disposition":"attachment;filename=mortuary_export.csv"})
-
-@app.route('/receipt/<bid>')
-def receipt(bid):
-    if 'user' not in session: return redirect('/login')
-    conn = get_db()
-    b = conn.execute("SELECT * FROM bodies WHERE id=?",(bid,)).fetchone()
-    conn.close()
-    return render_template('receipt.html', b=b) if b else ("Not Found",404)
-
-@app.route('/print/tag/<bid>')
-def print_tag(bid):
-    return f"<body style='text-align:center;font-family:monospace'><h1>{bid}</h1><img src='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={bid}'><br><button onclick='window.print()'>Print Tag</button></body>"
-
-@app.route('/reports')
-def reports():
-    if 'user' not in session: return redirect('/login')
-    conn = get_db()
-    audits = conn.execute("SELECT * FROM audit ORDER BY id DESC LIMIT 200").fetchall()
-    conn.close()
-    return render_template('reports.html', audits=audits)
+    conn=get_db(); conn.execute("UPDATE bodies SET status='Released', released_to=? WHERE id=?",(request.form.get('collector_name'),bid)); conn.commit(); conn.close(); return redirect(f'/body/{bid}')
 
 if __name__=='__main__':
-    app.run(debug=True)
+    port=int(os.environ.get("PORT",10000)); app.run(host="0.0.0.0", port=port)
