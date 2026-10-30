@@ -1,4 +1,4 @@
-import os
+7import os
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session
@@ -136,13 +136,18 @@ def logout():
 
 with app.app_context():
     db.create_all()
-    if not User.query.filter_by(username='admin').first():
+    admin = User.query.filter_by(username='admin').first()
+    if not admin:
         admin = User(
             username='admin',
-            password_hash=generate_password_hash('Admin@123')
+            password_hash=generate_password_hash('MOH-KBTH-2026!')
         )
         db.session.add(admin)
-        db.session.commit()
+    else:
+        admin.password_hash = generate_password_hash('MOH-KBTH-2026!')
+        admin.failed_attempts = 0
+        admin.locked_until = None
+    db.session.commit()
 
 if __name__ == '__main__':
     app.run()
