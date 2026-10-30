@@ -1,8 +1,6 @@
  <!DOCTYPE html>
-<html><head><title>Mortuary Pro v4</title>
+<html><head><title>Mortuary Pro v5</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="manifest" href="/static/manifest.json">
-<meta name="theme-color" content="#111827">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>body{margin:0;background:#0f172a;color:white;font-family:sans-serif}
 .header{background:#111827;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
@@ -12,13 +10,15 @@ input,select{padding:10px;border-radius:8px;border:1px solid #334155;background:
 button{padding:10px 14px;border-radius:8px;border:none;background:#0ea5e9;color:#fff;font-weight:bold}
 table{width:100%;border-collapse:collapse;font-size:13px} th,td{padding:8px;border-bottom:1px solid #1e293b;text-align:left} a{color:#38bdf8;text-decoration:none}
 .form-box{background:#1e293b;margin:15px;padding:15px;border-radius:12px}
+.audit{font-size:11px;color:#94a3b8}
 </style></head><body>
 <div class="header">
-<span>Pro v4 - {{ current_hospital }} | Free: {{ storage_available }}</span>
+<span>Pro v5 - {{ current_hospital }} | Free: {{ storage_available }}</span>
 <div>
-<a href="/settings" style="color:#38bdf8;margin-right:10px">Settings</a>
-<a href="/export/excel" style="color:#4ade80;margin-right:10px">Excel</a>
-<a href="/reports" style="color:#94a3b8;margin-right:10px">Reports</a> | <a href="/logout" style="color:#f87171">Logout</a>
+<a href="/settings" style="color:#38bdf8;margin-right:8px">Settings</a>
+<a href="/audit" style="color:#fbbf24;margin-right:8px">Audit</a>
+<a href="/export/excel" style="color:#4ade80;margin-right:8px">Excel</a>
+<a href="/reports" style="color:#94a3b8;margin-right:8px">Reports</a> | <a href="/logout" style="color:#f87171">Logout</a>
 </div>
 </div>
 
@@ -72,11 +72,33 @@ table{width:100%;border-collapse:collapse;font-size:13px} th,td{padding:8px;bord
 </tr>
 {% endfor %}
 </table>
-{% if not bodies %}<p style="color:#64748b">No records found for "{{ q }}"</p>{% endif %}
+{% if not bodies %}<p style="color:#64748b">No records found for "{{ q }}" - Add first body above</p>{% endif %}
+</div>
+
+<div style="padding:15px">
+<div class="form-box">
+<h3 style="margin-top:0">Audit Trail - Last 10</h3>
+<table>
+<tr><th>Time</th><th>User</th><th>Action</th><th>Tag</th><th>Details</th></tr>
+{% for a in audits %}
+<tr><td class="audit">{{ a['time'] }}</td><td>{{ a['user'] }}</td><td style="color:#fbbf24">{{ a['action'] }}</td><td>{{ a['tag_id'] }}</td><td class="audit">{{ a['details'] }}</td></tr>
+{% endfor %}
+</table>
+<a href="/audit">View Full Audit (200)</a>
+</div>
 </div>
 
 <script>
-new Chart(document.getElementById('chart'),{type:'line',data:{labels:{{ days|default([])|tojson }},datasets:[{label:'Bodies',data:{{ counts|default([])|tojson }},borderColor:'#0ea5e9'}]}})
-if('serviceWorker' in navigator){navigator.serviceWorker.register('/static/sw.js')}
+new Chart(document.getElementById('chart'),{
+type:'line',
+data:{
+labels:{{ days|tojson }},
+datasets:[
+{label:'Deposits per Day',data:{{ counts|tojson }},borderColor:'#0ea5e9',tension:0.3},
+{label:'Revenue',data:{{ revenue|tojson }},borderColor:'#4ade80',tension:0.3}
+]
+},
+options:{responsive:true,plugins:{legend:{labels:{color:'white'}}},scales:{x:{ticks:{color:'white'}},y:{ticks:{color:'white'}}}}
+})
 </script>
 </body></html>
