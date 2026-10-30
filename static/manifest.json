@@ -1,0 +1,9 @@
+{
+  "name": "Mortuary Tracking System",
+  "short_name": "Mortuary",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#111827",
+  "icons": [{"src": "https://cdn-icons-png.flaticon.com/512/2966/2966327.png","sizes": "512x512","type": "image/png"}]
+}
