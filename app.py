@@ -1,5 +1,5 @@
 import re
-from flask import Flask, render_template, request, redirect, url_for, flash, abort
+from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_limiter import Limiter
@@ -18,7 +18,6 @@ app.config['SESSION_COOKIE_SECURE'] = True
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
-
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"], storage_uri="memory://")
 
 class User(UserMixin, db.Model):
@@ -47,47 +46,37 @@ def load_user(user_id):
 def log_action(action):
     try:
         log = AuditLog(user_id=current_user.id if current_user.is_authenticated else None, action=action, ip_address=request.remote_addr)
-        db.session.add(log)
-        db.session.commit()
-    except:
-        pass
+        db.session.add(log); db.session.commit()
+    except: pass
 
 def sanitize_input(text):
-    if not text:
-        return ""
+    if not text: return ""
     return re.sub(r"[^a-zA-Z0-9@.\- ]", "", text.strip())[:100]
 
 @app.route('/')
 def index():
-    if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
-    return redirect(url_for('login'))
+    return redirect(url_for('dashboard') if current_user.is_authenticated else url_for('login'))
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['GET','POST'])
 @limiter.limit("5 per 15 minutes")
 def login():
     if request.method == 'POST':
         username = sanitize_input(request.form.get('username'))
-        password = request.form.get('password', '')
+        password = request.form.get('password','')
         user = User.query.filter_by(username=username).first()
         if user and user.locked_until and user.locked_until > datetime.utcnow():
             flash('Account locked. Try again after 15 minutes.')
             return render_template('login.html')
         if user and check_password_hash(user.password_hash, password):
-            user.failed_attempts = 0
-            user.locked_until = None
-            db.session.commit()
-            login_user(user)
-            log_action(f"Login success: {username}")
+            user.failed_attempts = 0; user.locked_until = None; db.session.commit()
+            login_user(user); log_action(f"Login success: {username}")
             return redirect(url_for('dashboard'))
         else:
             if user:
                 user.failed_attempts += 1
-                if user.failed_attempts >= 5:
-                    user.locked_until = datetime.utcnow() + timedelta(minutes=15)
+                if user.failed_attempts >= 5: user.locked_until = datetime.utcnow() + timedelta(minutes=15)
                 db.session.commit()
-            flash('Invalid username or password')
-            log_action(f"Failed login: {username}")
+            flash('Invalid username or password'); log_action(f"Failed login: {username}")
     return render_template('login.html')
 
 @app.route('/dashboard')
@@ -99,9 +88,7 @@ def dashboard():
 @app.route('/logout')
 @login_required
 def logout():
-    log_action(f"Logout: {current_user.username}")
-    logout_user()
-    return redirect(url_for('login'))
+    log_action(f"Logout: {current_user.username}"); logout_user(); return redirect(url_for('login'))
 
 with app.app_context():
     db.create_all()
@@ -111,9 +98,7 @@ with app.app_context():
         db.session.add(admin)
     else:
         admin.password_hash = generate_password_hash('MOH-KBTH-2026!')
-        admin.failed_attempts = 0
-        admin.locked_until = None
+        admin.failed_attempts = 0; admin.locked_until = None
     db.session.commit()
 
-if __name__ == '__main__':
-    app.run()
+if __name__ == '__main__': app.run()
