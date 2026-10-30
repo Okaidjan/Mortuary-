@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="/static/manifest.json">
+<style>body{margin:0;background:#0f172a;color:white;font-family:sans-serif;padding:15px}
+.card{background:#1e293b;padding:15px;border-radius:10px;margin:10px 0}
+img{max-width:100%} input,select{padding:8px;border-radius:5px;border:0;margin:3px}
+button{padding:8px 12px;border-radius:5px;border:0;background:#2563eb;color:white}
+</style></head><body>
+<a href="/dashboard" style="color:#60a5fa">← Dashboard</a>
+<div class="card">
+<h2>{{body.id}} - {{body.name}}</h2>
+<p>QR Identification</p>
+<img src="data:image/png;base64,{{body.qr}}" style="width:150px;background:white;padding:10px;border-radius:10px">
+<p>Storage: {{body.storage_id}} | Hospital: {{body.hospital}} | Status: {{body.status}}</p>
+</div>
+
+<div class="card">
+<h3>Next of Kin Management</h3>
+<p>Name: {{kin.name}} | Phone: {{kin.phone}} | Rel: {{kin.relationship}}</p>
+</div>
+
+<div class="card">
+<h3>Financial / Billing</h3>
+{% for b in bills %}
+<p>{{b.id}} - {{b.type}} - GHS {{b.amount}} - {{b.status}}
+{% if b.status=='Unpaid' %}
+<form method="POST" action="/pay/{{b.id}}" style="display:inline">
+<input name="amount" value="{{b.amount}}" style="width:80px">
+<select name="method"><option>Cash</option><option>MoMo</option><option>Card</option></select>
+<button>Pay</button>
+</form>
+{% endif %}</p>
+{% endfor %}
+<h4>Payments / Receipts</h4>
+{% for p in payments %}
+<p>{{p.receipt_no}} - GHS {{p.amount}} - {{p.method}} - <a href="/receipt/{{p.id}}" style="color:#60a5fa">View Receipt</a></p>
+{% endfor %}
+</div>
+
+<div class="card">
+<h3>Release Authorisation</h3>
+{% if body.status=='Deposited' and not release %}
+<form method="POST" action="/release/request/{{body.id}}">
+<input name="docs" placeholder="ID Docs, Police report" required>
+<button>Request Release</button>
+</form>
+{% elif release and not release.authorized %}
+<p>Requested by {{release.requested_by}} - Waiting authorization</p>
+<form method="POST" action="/release/authorize/{{body.id}}">
+<button style="background:#16a34a">AUTHORIZE RELEASE (Admin only)</button>
+</form>
+{% elif body.status=='Released' %}
+<p style="color:#22c55e">✓ Released by {{release.authorized_by}}</p>
+{% endif %}
+</div>
+</body></html>
