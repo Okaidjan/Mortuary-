@@ -1,0 +1,12 @@
+<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Deposit</title>
+<style>body{margin:0;font-family:sans-serif;background:#f1f5f9} .nav{background:#1e293b;color:#fff;padding:10px 14px;display:flex;gap:12px;flex-wrap:wrap;font-size:13px} .nav a{color:#cbd5e1;text-decoration:none} .card{background:#fff;margin:14px;padding:14px;border-radius:10px} input,select{width:100%;padding:10px;margin:6px 0;border-radius:8px;border:1px solid #cbd5e1;box-sizing:border-box} button{padding:10px 14px;background:#0ea5e9;border:none;border-radius:8px;color:#fff;font-weight:bold}</style></head><body>
+<div class="nav"><b>Mortuary</b> <a href="/">Dashboard</a> <a href="/records">Records</a> <a href="/deposit" style="color:#38bdf8">+Deposit</a> <a href="/audit">Audit log</a> <a href="/users">Users</a> <a href="/export/csv">Export CSV</a> <a href="/settings">Settings</a> <a href="/logout">Logout</a></div>
+<div class="card"><h3>Add Body + Kin</h3><p style="font-size:12px;color:#64748b">Fee: GHS 100 + 50/day</p>
+<form method="POST" action="/add">
+<input name="name" placeholder="Deceased Name *" required>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><input name="age" placeholder="Age"><select name="gender"><option>Male</option><option>Female</option></select></div>
+<input name="cause" placeholder="Cause of Death">
+<hr>
+<input name="kin_name" placeholder="Kin Name"><input name="kin_phone" placeholder="Kin Phone"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><input name="kin_rel" placeholder="Relationship"><input name="kin_id" placeholder="Ghana Card ID"></div>
+<button type="submit" style="width:100%;margin-top:10px">Deposit + QR + Bill</button>
+</form></div></body></html>
